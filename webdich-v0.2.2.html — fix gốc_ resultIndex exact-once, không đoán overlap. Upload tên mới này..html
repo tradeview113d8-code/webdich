@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#000000">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>WebDich v0.2 — Voice → Text</title>
+      <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+/* WebDich v0.1 — ultra-minimal, black, thin borders, mobile-first (spec §15, §16) */
+:root {
+  --bg: #000000;
+  --line: rgba(255, 255, 255, 0.12);
+  --text: #f2f2f2;
+  --muted: rgba(255, 255, 255, 0.42);
+  --live: rgba(255, 255, 255, 0.6);
+  --mic-off: #3a3a3a;
+  --mic-on: #ffffff;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body { height: 100%; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Be Vietnam Pro', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+.app {
+  position: relative;
+  height: 100dvh;
+  height: 100vh; /* fallback */
+  display: flex;
+  flex-direction: column;
+  max-width: 560px;
+  margin: 0 auto;
+  border-left: 1px solid var(--line);
+  border-right: 1px solid var(--line);
+}
+/* persistent tiny version badge — always visible to confirm which build is deployed */
+.version-badge {
+  position: absolute;
+  bottom: 6px;
+  right: 10px;
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  color: rgba(255, 255, 255, 0.28);
+  pointer-events: none;
+  z-index: 5;
+  font-weight: 500;
+}
+
+/* ---- LIVE VOICE — 1/6 (spec §2.1) ---- */
+.live {
+  flex: 0 0 16.6667%;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--line);
+  font-size: clamp(16px, 4.5vw, 22px);
+  font-weight: 300;
+  color: var(--live);
+  text-align: center;
+  overflow: hidden;
+  line-height: 1.4;
+  word-break: break-word;
+}
+.live.status {
+  color: rgba(255, 130, 130, 0.85);
+  font-size: 13px;
+  letter-spacing: 0.02em;
+}
+
+/* ---- FINAL — 4/6, two columns (spec §3) ---- */
+.final {
+  flex: 1 1 auto; /* fills remaining ~66.67% */
+  min-height: 0;
+  display: flex;
+  border-bottom: 1px solid var(--line);
+}
+.col {
+  flex: 1 1 50%;
+  min-width: 0;
+  padding: 14px 12px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.col + .col { border-left: 1px solid var(--line); }
+.col-label {
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 12px;
+  font-weight: 500;
+}
+.col p {
+  font-size: 15px;
+  line-height: 1.6;
+  font-weight: 400;
+  margin-bottom: 12px;
+  color: var(--text);
+  word-break: break-word;
+}
+
+/* ---- MIC — 1/6 (spec §13, §14) ---- */
+.mic-row {
+  flex: 0 0 16.6667%;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#mic {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--mic-off); /* OFF = gray */
+  cursor: pointer;
+  padding: 0;
+  position: relative;
+  transition: background 0.2s ease, transform 0.1s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+#mic.on { background: var(--mic-on); } /* ON = white */
+#mic:active { transform: scale(0.94); }
+#mic svg {
+  width: 26px;
+  height: 26px;
+  display: block;
+  margin: 0 auto;
+}
+#mic .mic-stroke { stroke: #9a9a9a; transition: stroke 0.2s ease; }
+#mic.on .mic-stroke { stroke: #000000; }
+
+/* subtle pulse ring while listening — simple, no complex animation */
+#mic.on::before {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  animation: wd-pulse 2.2s ease-out infinite;
+  pointer-events: none;
+}
+@keyframes wd-pulse {
+  0%   { transform: scale(0.92); opacity: 0.9; }
+  100% { transform: scale(1.3);  opacity: 0; }
+}
+
+@media (max-width: 380px) {
+  #mic { width: 56px; height: 56px; }
+  #mic svg { width: 22px; height: 22px; }
+  .col p { font-size: 14px; }
+}
+
+</style>
+</head>
+<body>
+  <div class="app">
+    <!-- 1/6 — LIVE VOICE (spec §2.1): only realtime partial text -->
+    <div id="live" class="live" aria-live="polite"></div>
+    <!-- 4/6 — FINAL: EN left, VI right (spec §3) -->
+    <div class="final">
+      <div id="final-en" class="col">
+        <div class="col-label">Final English</div>
+      </div>
+      <div id="final-vi" class="col">
+        <div class="col-label">Final Vietnamese</div>
+      </div>
+    </div>
+    <!-- 1/6 — MIC (spec §13) -->
+    <div class="mic-row">
+      <button id="mic" aria-label="Toggle microphone" aria-pressed="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect class="mic-stroke" x="9" y="3" width="6" height="11" rx="3"/>
+          <path class="mic-stroke" d="M5 11a7 7 0 0 0 14 0"/>
+          <line class="mic-stroke" x1="12" y1="18" x2="12" y2="22"/>
+        </svg>
+      </button>
+    </div>
+    <div id="version-badge" class="version-badge"></div>
+  </div>
+  <script>
+/* WebDich v0.2.2 — Voice → Text (row-synced, language-split chunks)
+ * Fix: process ONLY changed results via e.resultIndex — never re-read committed
+ * final history. Each final segment commits exactly once. A small exact-prefix
+ * guard (built from our own committed text, not guessed) handles restart re-transcribe.
+ * Test hook: if loaded under Node, exports __test__ for fake-speech replay tests.
+ */
+(function () {
+  'use strict';
+
+  // ---------- DOM ----------
+  var liveEl = document.getElementById('live');
+  var enEl = document.getElementById('final-en');
+  var viEl = document.getElementById('final-vi');
+  var micBtn = document.getElementById('mic');
+
+  // ---------- Config ----------
+  var CHUNK_MS = 2000;      // one "voice" chunk = 2 seconds of speech
+  var TAIL_WORDS = 15;      // exact committed tail kept for prefix guard
+  var VERSION = 'v0.2.2';
+  var BUILD = '20260910-2100';
+
+  // ---------- State ----------
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  var supported = !!SR;
+  var micOn = false;
+  var rec = null;
+  var userStopped = false;
+  var restartTimer = null;
+  var chunkTimer = null;
+  var committedTail = '';   // EXACT last committed words (built by us, never guessed)
+  var preferredLang = navigator.language || 'en-US';
+  var rows = [];            // [{en, vi, finalized}] — synchronized row model
+  var activeRow = null;     // row currently being filled
+
+  // ---------- Word lists (per-word language classification) ----------
+  var VI_DIACRITIC_RE = /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/;
+  var NON_ASCII_RE = /[^\x00-\x7F]/;
+  var VI_STOP = ['tôi','bạn','xin','chào','là','có','không','đi','đến','một','người','đây','đó',
+    'gì','nào','mình','anh','chị','em','được','rồi','đang','sẽ','vì','nhưng','mà','và','với','từ',
+    'trong','trên','dưới','giữa','sau','trước','ngay','rất','nhiều','ít','kia','này','hay','hoặc',
+    'nếu','khi','đã','cũng','đều','lại','vẫn','chỉ','thì','ga','tàu','xe','nhà','biển','phố','ăn',
+    'uống','nước','muốn','cảm','ơn','lỗi','cho','hỏi','ở','đâu','ra','vào','lên','xuống','qua','tiếp',
+    'theo','nơi','đường','phải','trái','thẳng','đầu','cuối','giờ','phút','ngày','tuần','tháng','năm',
+    'sáng','trưa','chiều','tối','nay','mai','quá','lại','nữa','về','xem','biết','nghe','nói','hỏi',
+    'đợi','gặp','làm','lấy','đưa','trả','mua','bán','giá','bao','nhiêu','đồng','tiền','thẻ','vé',
+    'máy','bay','sân','khách','sạn','nhà','hàng','quán','phòng','tắm','ngủ','y','tế','bệnh','viện',
+    'thuốc','cứu','hỏa','trạm','ai','ấy','hắn','cô','dì','chú','bác','ông','bà','con','cháu','bè',
+    'nhau','tạm','biệt','hẹn','lại','tên','gọi','xa','gần','thế','nào','ạ','ơi','ồ','à'];
+  var EN_STOP = ['the','is','are','was','were','i','you','he','she','it','we','they','to','of','in',
+    'for','on','with','at','by','from','up','about','into','over','after','be','have','has','had',
+    'do','does','did','this','that','these','those','and','but','or','not','no','yes','hello','want',
+    'wants','go','goes','home','station','train','how','what','where','when','why','a','an','my',
+    'your','his','her','our','their','me','him','us','them','will','would','can','could','should',
+    'please','thank','thanks','good','morning','afternoon','evening','night','bye','ok','okay','yeah',
+    'like','get','take','make','see','know','think','say','said','tell','come','came','give','need',
+    'time','today','tomorrow','yesterday','now','then','here','there','very','really','so','too',
+    'just','only','also','well','right','left','straight','first','last','next','bus','taxi','hotel',
+    'airport','street','road','city','country','food','water','coffee','tea','beer','wine','menu',
+    'bill','check','money','ticket','passport','bag','luggage','help','emergency','doctor','pharmacy',
+    'hospital','police','excuse','sorry','welcome','much','many','few','little','more','less','again',
+    'still','already','yet','ever','never','always','often','sometimes','maybe','perhaps','sure',
+    'course','fine','great','nice','expensive','cheap','big','small','hot','cold','open','closed',
+    'early','late','far','near','fast','slow','stop','wait','walk','drive','fly','run','sit','stand',
+    'eat','drink','sleep','work','play','read','write','listen','watch','learn','buy','sell','pay',
+    'cost','find','love','enjoy','remember','forget','understand','believe','hope','must','all','each',
+    'every','both','other','some','such','nor','own','same','than','because','as','until','while',
+    'against','between','through','during','before','above','below','down','out','off','under',
+    'further','once','which','who','whom','whose','hi','hey','oh','wow','uh','um','hmm'];
+
+  // ---------- Helpers ----------
+  function normalizeText(t) { return (t || '').trim().replace(/\s+/g, ' '); }
+  function stripPunct(w) { return w.replace(/[.,!?;:()"'\[\]{}<>]/g, ''); }
+
+  function classifyWord(w) {
+    var low = stripPunct((w || '').toLowerCase());
+    if (!low) return null;
+    if (VI_DIACRITIC_RE.test(w)) return 'vi';
+    if (VI_STOP.indexOf(low) >= 0) return 'vi';
+    if (EN_STOP.indexOf(low) >= 0) return 'en';
+    if (NON_ASCII_RE.test(w)) return 'vi';
+    return 'en';
+  }
+
+  // Split a text increment into maximal same-language runs.
+  function splitByLanguage(text) {
+    var words = normalizeText(text).split(' ').filter(Boolean);
+    var segs = [], curLang = null, curWords = [];
+    for (var i = 0; i < words.length; i++) {
+      var lang = classifyWord(words[i]) || curLang || 'en';
+      if (curLang === null) { curLang = lang; curWords = [words[i]]; }
+      else if (lang === curLang) { curWords.push(words[i]); }
+      else {
+        segs.push({ lang: curLang, text: curWords.join(' ') });
+        curLang = lang; curWords = [words[i]];
+      }
+    }
+    if (curLang !== null) segs.push({ lang: curLang, text: curWords.join(' ') });
+    return segs;
+  }
+
+  // Exact-prefix guard: strip any words already committed at the tail.
+  // `committedTail` is built by us from committed segments — exact, not guessed.
+  // Handles recognition-restart re-transcription and cumulative-result transcripts.
+  function stripCommittedPrefix(seg) {
+    var a = committedTail.toLowerCase().split(' ').slice(-TAIL_WORDS);
+    var bLow = normalizeText(seg).toLowerCase().split(' ');
+    var bOrig = normalizeText(seg).split(' ');
+    var maxK = Math.min(a.length, bLow.length), k = 0, i, j, match;
+    for (i = maxK; i >= 1; i--) {
+      match = true;
+      for (j = 0; j < i; j++) {
+        if (a[a.length - i + j] !== bLow[j]) { match = false; break; }
+      }
+      if (match) { k = i; break; }
+    }
+    return bOrig.slice(k).join(' ').trim();
+  }
+  function appendCommitted(seg) {
+    committedTail = normalizeText(committedTail + ' ' + seg)
+      .split(' ').slice(-TAIL_WORDS).join(' ');
+  }
+
+  // ---------- Live text ----------
+  function updateLiveText(text) {
+    liveEl.classList.remove('status');
+    liveEl.style.opacity = '';
+    liveEl.textContent = text || '';
+  }
+  function clearLive() {
+    liveEl.classList.remove('status');
+    liveEl.style.opacity = '';
+    liveEl.textContent = '';
+  }
+  function showStatus(msg) {
+    liveEl.classList.add('status');
+    liveEl.style.opacity = '';
+    liveEl.textContent = msg;
+  }
+
+  // ---------- Row model (synchronized EN | VI) ----------
+  function ensureActiveRow() {
+    if (!activeRow || activeRow.finalized) {
+      activeRow = { en: '', vi: '', finalized: false };
+      rows.push(activeRow);
+    }
+  }
+  function appendToCell(cell, text) {
+    activeRow[cell] = activeRow[cell] ? activeRow[cell] + ' ' + text : text;
+  }
+  function handleIncrement(text) {
+    text = normalizeText(text);
+    if (!text) return;
+    ensureActiveRow();
+    var segs = splitByLanguage(text);
+    var viWords = 0, enWords = 0;
+    for (var i = 0; i < segs.length; i++) {
+      var s = segs[i];
+      var wc = s.text.split(' ').length;
+      if (s.lang === 'vi') { appendToCell('vi', s.text); viWords += wc; }
+      else { appendToCell('en', s.text); enWords += wc; }
+    }
+    preferredLang = (viWords >= enWords) ? 'vi-VN' : 'en-US';
+    renderRows();
+  }
+  function renderRows() {
+    enEl.innerHTML = '';
+    viEl.innerHTML = '';
+    var le = document.createElement('div');
+    le.className = 'col-label'; le.textContent = 'Final English';
+    enEl.appendChild(le);
+    var lv = document.createElement('div');
+    lv.className = 'col-label'; lv.textContent = 'Final Vietnamese';
+    viEl.appendChild(lv);
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      var pe = document.createElement('p');
+      pe.textContent = r.en || '\u00A0';
+      if (!r.en) pe.style.opacity = '0.25';
+      enEl.appendChild(pe);
+      var pv = document.createElement('p');
+      pv.textContent = r.vi || '\u00A0';
+      if (!r.vi) pv.style.opacity = '0.25';
+      viEl.appendChild(pv);
+    }
+    enEl.scrollTop = enEl.scrollHeight;
+    viEl.scrollTop = viEl.scrollHeight;
+  }
+
+  // ---------- Chunk timer: one "voice" row every CHUNK_MS ----------
+  function startChunkTimer() {
+    stopChunkTimer();
+    chunkTimer = setInterval(function () {
+      if (activeRow && (activeRow.en || activeRow.vi)) {
+        activeRow.finalized = true;
+        renderRows();
+      }
+    }, CHUNK_MS);
+  }
+  function stopChunkTimer() {
+    if (chunkTimer) { clearInterval(chunkTimer); chunkTimer = null; }
+  }
+
+  // ---------- Speech result handler (exact-once, no history re-read) ----------
+  // Iterate from e.resultIndex: only results that changed THIS event.
+  // A final result is seen exactly once at the moment it finalizes; later events
+  // have resultIndex past it. No overlap guessing needed for in-session commits.
+  function onSpeechResult(e) {
+    var interim = '';
+    for (var i = e.resultIndex; i < e.results.length; i++) {
+      var r = e.results[i];
+      var t = (r[0] && r[0].transcript) ? r[0].transcript : '';
+      if (r.isFinal) {
+        var seg = normalizeText(t);
+        if (seg) {
+          seg = stripCommittedPrefix(seg); // guard: restart re-transcribe / cumulative result
+          if (seg) {
+            appendCommitted(seg);
+            handleIncrement(seg);
+          }
+        }
+      } else {
+        interim += t;
+      }
+    }
+    if (interim) updateLiveText(interim.trim());
+    else clearLive();
+  }
+
+  // ---------- Speech Recognition ----------
+  function startRecognition() {
+    if (!supported) {
+      showStatus('Speech recognition is not supported in this browser. Use Chrome / Edge on desktop or Android.');
+      return;
+    }
+    stopRecognitionSilent();
+    rec = new SR();
+    rec.continuous = true;
+    rec.interimResults = true;
+    rec.lang = preferredLang;
+    rec.maxAlternatives = 1;
+    userStopped = false;
+    rec.onresult = onSpeechResult;
+    rec.onerror = function (e) {
+      var err = e.error || '';
+      if (err === 'not-allowed' || err === 'service-not-allowed') {
+        userStopped = true; micOn = false; updateMicUI(); stopChunkTimer();
+        showStatus('Microphone access denied. Allow mic permission and tap again.');
+      } else if (err === 'audio-capture') {
+        userStopped = true; micOn = false; updateMicUI(); stopChunkTimer();
+        showStatus('No microphone found on this device.');
+      } else if (err === 'network') {
+        showStatus('Speech service offline. Retrying…');
+      }
+    };
+    rec.onend = function () {
+      if (micOn && !userStopped) {
+        clearTimeout(restartTimer);
+        restartTimer = setTimeout(function () {
+          if (micOn && !userStopped) startRecognition();
+        }, 200);
+      }
+    };
+    try { rec.start(); } catch (err) { /* already started */ }
+  }
+  function stopRecognitionSilent() {
+    clearTimeout(restartTimer);
+    if (rec) { try { rec.stop(); } catch (e) {} rec = null; }
+  }
+
+  // ---------- Microphone control ----------
+  function startMicrophone() {
+    micOn = true;
+    committedTail = '';
+    rows = [];
+    activeRow = null;
+    renderRows();
+    updateMicUI();
+    startChunkTimer();
+    startRecognition();
+  }
+  function stopMicrophone() {
+    userStopped = true;
+    micOn = false;
+    stopChunkTimer();
+    if (activeRow && (activeRow.en || activeRow.vi)) activeRow.finalized = true;
+    stopRecognitionSilent();
+    updateMicUI();
+    clearLive();
+    renderRows();
+  }
+  function updateMicUI() {
+    micBtn.classList.toggle('on', micOn);
+    micBtn.setAttribute('aria-pressed', micOn ? 'true' : 'false');
+  }
+  micBtn.addEventListener('click', function () {
+    if (micOn) stopMicrophone();
+    else startMicrophone();
+  });
+
+  // ---------- Init ----------
+  liveEl.textContent = 'WebDich ' + VERSION + ' · tap mic';
+  liveEl.style.opacity = '0.45';
+  var badge = document.getElementById('version-badge');
+  if (badge) badge.textContent = VERSION;
+  if (!supported) {
+    showStatus('WebDich ' + VERSION + ' · speech recognition not supported here. Use Chrome / Edge (desktop or Android) over HTTPS or localhost.');
+  }
+
+  // ---------- Test hook (Node only, no-op in browser) ----------
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = {
+      VERSION: VERSION,
+      reset: function () { committedTail = ''; rows = []; activeRow = null; },
+      getRows: function () { return rows.map(function (r) { return { en: r.en, vi: r.vi }; }); },
+      onSpeechResult: onSpeechResult,
+      splitByLanguage: splitByLanguage,
+      stripCommittedPrefix: stripCommittedPrefix,
+      appendCommitted: appendCommitted
+    };
+  }
+})();
+
+</script>
+</body>
+</html>
