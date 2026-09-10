@@ -205,6 +205,7 @@ body {
   var finalEnglish = [];   // buffer per language (spec §11)
   var finalVietnamese = [];
   var lastFinal = '';      // anti-duplication (spec §10, §20)
+  var committedFinal = ''; // accumulated committed transcript (for overlap strip)
   var preferredLang = navigator.language || 'en-US'; // adaptive ASR language
   var CONFIDENCE_THRESHOLD = 0.70; // spec §6
 
@@ -291,6 +292,28 @@ body {
     return { language: 'unknown', confidence: 0.4 };
   }
 
+  // ---------- Overlap stripping (fix: Chrome continuous mode re-delivers accumulated transcript) ----------
+  // Word-level, case-insensitive. Returns only the NEW words in `curr` that are
+  // not already a suffix of `prev`. Persists across recognition auto-restarts.
+  // Pure duplicate / stutter ("hello hello") → empty string → dropped.
+  function normalizeText(t) { return (t || '').trim().replace(/\s+/g, ' '); }
+
+  function stripOverlap(prev, curr) {
+    var a = normalizeText(prev).toLowerCase().split(' ').slice(-20); // recent tail only
+    var bLow = normalizeText(curr).toLowerCase().split(' ');
+    var bOrig = normalizeText(curr).split(' ');
+    var maxK = Math.min(a.length, bLow.length);
+    var k = 0;
+    for (var i = maxK; i >= 1; i--) {
+      var match = true;
+      for (var j = 0; j < i; j++) {
+        if (a[a.length - i + j] !== bLow[j]) { match = false; break; }
+      }
+      if (match) { k = i; break; }
+    }
+    return bOrig.slice(k).join(' ').trim();
+  }
+
   // ---------- Live text (spec §9: replace, never append) ----------
   function updateLiveText(text) {
     liveEl.classList.remove('status');
@@ -306,12 +329,28 @@ body {
   }
 
   // ---------- Final buffers (spec §11, §10: commit once) ----------
+  // Tiny fragments (≤3 words, typical of Android Chrome's frequent final events)
+  // are appended to the last line of the same language when no sentence boundary
+  // exists — prevents one-word-per-line fragmentation without adding latency.
+  function wordCount(t) { return (t || '').trim().split(/\s+/).filter(Boolean).length; }
+  function endsWithSentenceBoundary(t) { return /[.?!。？！:;]\s*$/.test(t || ''); }
+
   function commitEnglish(text) {
-    finalEnglish.push(text);
+    var last = finalEnglish.length ? finalEnglish[finalEnglish.length - 1] : '';
+    if (last && !endsWithSentenceBoundary(last) && wordCount(text) <= 3) {
+      finalEnglish[finalEnglish.length - 1] = last + ' ' + text;
+    } else {
+      finalEnglish.push(text);
+    }
     renderFinals();
   }
   function commitVietnamese(text) {
-    finalVietnamese.push(text);
+    var last = finalVietnamese.length ? finalVietnamese[finalVietnamese.length - 1] : '';
+    if (last && !endsWithSentenceBoundary(last) && wordCount(text) <= 3) {
+      finalVietnamese[finalVietnamese.length - 1] = last + ' ' + text;
+    } else {
+      finalVietnamese.push(text);
+    }
     renderFinals();
   }
   function renderFinals() {
@@ -380,15 +419,26 @@ body {
     userStopped = false;
 
     rec.onresult = function (e) {
-      var interim = '', final = '';
-      for (var i = e.resultIndex; i < e.results.length; i++) {
+      var interim = '', eventFinal = '';
+      // Iterate ALL results: eventFinal = accumulated final transcript for this
+      // session (Chrome continuous mode keeps finalized results in the list).
+      for (var i = 0; i < e.results.length; i++) {
         var r = e.results[i];
         var t = (r[0] && r[0].transcript) ? r[0].transcript : '';
-        if (r.isFinal) final += t;
+        if (r.isFinal) eventFinal += t + ' ';
         else interim += t;
       }
       if (interim) handlePartial(interim);
-      if (final) handleFinal(final);
+      if (eventFinal.trim()) {
+        // Strip everything already committed; keep only the new increment.
+        var increment = stripOverlap(committedFinal, eventFinal);
+        if (increment) {
+          committedFinal = normalizeText(committedFinal + ' ' + increment)
+            .split(' ').slice(-40).join(' '); // bound memory
+          handleFinal(increment); // detect language on the NEW text only
+        }
+        // empty increment → pure duplicate / stutter → drop (not committed)
+      }
     };
 
     rec.onerror = function (e) {
@@ -434,6 +484,7 @@ body {
   function startMicrophone() {
     micOn = true;
     lastFinal = '';
+    committedFinal = ''; // fresh listening session
     updateMicUI();
     startRecognition();
   }
