@@ -1,97 +1,46 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="vi">
 <head>
-    <meta charset="UTF-8">
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
-
-    <meta
-        name="theme-color"
-        content="#111111"
-    >
-
-    <title>WebDich 0.1</title>
-
-    <link rel="stylesheet" href="style.css">
-    <link rel="manifest" href="manifest.json">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#000000">
+  <title>WebDich v0.1 — Voice → Text</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
 </head>
-
 <body>
+  <div class="app">
 
-<main class="app">
+    <!-- 1/6 — LIVE VOICE (spec §2.1): only realtime partial text -->
+    <div id="live" class="live" aria-live="polite"></div>
 
-    <header>
-        <h1>WebDich 0.1</h1>
-        <p>Realtime Voice → Text</p>
-    </header>
+    <!-- 4/6 — FINAL: EN left, VI right (spec §3) -->
+    <div class="final">
+      <div id="final-en" class="col">
+        <div class="col-label">Final English</div>
+      </div>
+      <div id="final-vi" class="col">
+        <div class="col-label">Final Vietnamese</div>
+      </div>
+    </div>
 
-    <section class="controls">
+    <!-- 1/6 — MIC (spec §13) -->
+    <div class="mic-row">
+      <button id="mic" aria-label="Toggle microphone" aria-pressed="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect class="mic-stroke" x="9" y="3" width="6" height="11" rx="3"/>
+          <path class="mic-stroke" d="M5 11a7 7 0 0 0 14 0"/>
+          <line class="mic-stroke" x1="12" y1="18" x2="12" y2="22"/>
+        </svg>
+      </button>
+    </div>
 
-        <select id="language">
-            <option value="en-US">English (US)</option>
-            <option value="en-GB">English (UK)</option>
-            <option value="vi-VN">Vietnamese</option>
-        </select>
+  </div>
 
-        <button id="startBtn">
-            🎤 START
-        </button>
-
-        <button id="stopBtn" disabled>
-            ■ STOP
-        </button>
-
-        <button id="clearBtn">
-            CLEAR
-        </button>
-
-    </section>
-
-    <section class="status">
-        <div>
-            <span>Status</span>
-            <strong id="status">IDLE</strong>
-        </div>
-
-        <div>
-            <span>Final words</span>
-            <strong id="finalWords">0</strong>
-        </div>
-
-        <div>
-            <span>Live words</span>
-            <strong id="liveWords">0</strong>
-        </div>
-
-        <div>
-            <span>Session</span>
-            <strong id="sessionTime">00:00</strong>
-        </div>
-    </section>
-
-    <section class="transcript">
-
-        <div class="panel">
-            <h2>FINAL</h2>
-            <div id="finalText"></div>
-        </div>
-
-        <div class="panel live">
-            <h2>LIVE</h2>
-            <div id="liveText"></div>
-        </div>
-
-    </section>
-
-    <section class="info">
-        <p id="supportMessage"></p>
-    </section>
-
-</main>
-
-<script src="app.js"></script>
-
+  <script src="app.js"></script>
 </body>
 </html>

@@ -1,8 +1,13 @@
 {
-    "name": "WebDich 0.1",
-    "short_name": "WebDich",
-    "start_url": "./",
-    "display": "standalone",
-    "background_color": "#111111",
-    "theme_color": "#111111"
+  "name": "WebDich v0.1 — Voice to Text",
+  "short_name": "WebDich",
+  "description": "Minimal voice → text prototype. Phase 1: live transcription with auto EN/VI detection.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
 }

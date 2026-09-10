@@ -1,77 +1,66 @@
-# WebDich 0.1
+# WebDich v0.1 — Voice → Text
 
-Prototype web tối giản: **Voice → Realtime Text**
+Phase 1 baseline. Single purpose: **MIC → realtime text → auto detect EN/VI → commit to the correct final column.**
+No translation, no TTS, no LLM, no backend, no history. (spec §1, §23)
 
-Mục tiêu duy nhất: Kiểm tra khả năng nhận giọng nói realtime trên trình duyệt bằng Web Speech API.
-
-## Tính năng
-
-- 🎤 Nhận diện giọng nói realtime
-- 📝 Hiển thị **LIVE** (interim) và **FINAL** (confirmed) riêng biệt
-- 🌐 Hỗ trợ ngôn ngữ: `en-US`, `en-GB`, `vi-VN`
-- 📊 Bộ đo realtime: Status, Final words, Live words, Session timer
-- ⏯️ Điều khiển: START / STOP / CLEAR
-- 📱 Responsive, PWA-ready
-
-## Không có trong phiên bản 0.1
-
-- ❌ Translation
-- ❌ TTS
-- ❌ Backend / WebSocket server
-- ❌ Login / Database
-- ❌ LLM / API key
-- ❌ Framework / npm / build system
-
-## Cấu trúc file
+## Files
 
 ```
 webdich-0.1/
-├── index.html      # Giao diện chính
-├── style.css       # Stylesheet
-├── app.js          # Logic nhận diện giọng nói
-├── manifest.json   # PWA manifest
-└── README.md       # Tài liệu này
+├── index.html      # layout: LIVE (1/6) | FINAL EN/VI (4/6) | MIC (1/6)
+├── style.css       # black, thin borders, mobile-first, no cards / no gradient
+├── app.js          # SpeechRecognition + live buffer + language detector + final buffers
+├── manifest.json   # PWA manifest (installable)
+├── icon.svg        # app icon
+└── README.md
 ```
 
-## Cách chạy
+## Run
 
-Mở trực tiếp `index.html` bằng trình duyệt hoặc deploy lên bất kỳ static hosting nào.
+Microphone + Web Speech API require a **secure context**: `https://` or `localhost`.
+Opening `index.html` directly via `file://` will block the mic in most browsers.
 
-**Yêu cầu trình duyệt:** Hỗ trợ Web Speech API (SpeechRecognition).
-Khuyến nghị: Chrome, Edge, Safari.
+```bash
+cd webdich-0.1
+python3 -m http.server 8080
+# then open http://localhost:8080
+```
 
-**Lưu ý:** Một số trình duyệt yêu cầu `https://` hoặc `localhost` để truy cập microphone.
+Best browser support: **Chrome / Edge (desktop or Android)**. Safari supports
+SpeechRecognition partially (no continuous mode on iOS); Firefox does not support it.
 
-## Quy tắc SPEC 0.1
+## How it works (spec §17)
 
-| Quy tắc | Nội dung |
-|---------|----------|
-| RULE-01 | Không backend |
-| RULE-02 | Không API key |
-| RULE-03 | Không LLM |
-| RULE-04 | Không translation |
-| RULE-05 | Không TTS |
-| RULE-06 | Không database |
-| RULE-07 | Không framework |
-| RULE-08 | Chỉ kiểm tra Voice → Realtime Text |
-| RULE-09 | LIVE có thể thay đổi |
-| RULE-10 | FINAL không được sửa lại |
-| RULE-11 | Không tự động hoàn thành câu |
-| RULE-12 | Không đoán phần người dùng chưa nói |
-| RULE-13 | Không gửi dữ liệu tới server riêng của project |
-| RULE-14 | Mục tiêu là benchmark, không phải sản phẩm hoàn chỉnh |
+```
+Microphone → Web Speech API (interim + final)
+           → LIVE = current partial (replace, never append — §9)
+           → on final: detectLanguage() → {vi|en|unknown, confidence}
+           → confidence ≥ 0.70 → commit to FINAL VI or FINAL EN (once — §10)
+           → unknown → stays in LIVE, not committed (§6)
+```
 
-## Tiêu chí PASS
+- `detectLanguage()` is a pure heuristic: Vietnamese diacritic count + VI/EN
+  stopword frequency. No AI, no network call (§5).
+- After a confident final, the ASR `lang` is adapted (`vi-VN` / `en-US`) for the
+  next recognition pass to improve accuracy.
+- If recognition stops unexpectedly while the mic is ON, it auto-restarts (§7, §20).
 
-- [x] Xin được microphone
-- [x] Nhận speech
-- [x] Có partial/interim text
-- [x] Có final text
-- [x] Có thể nói liên tục
-- [x] Không cần backend của project
-- [x] Có thể CLEAR
-- [x] Có thể STOP
+## Acceptance tests (spec §22)
 
-## Hướng phát triển 0.2
+1. Say *"Xin chào, tôi muốn đi đến ga tàu."* → appears in **FINAL VIETNAMESE**, EN stays empty.
+2. Say *"Hello, I want to go to the train station."* → appears in **FINAL ENGLISH**, VI stays empty.
+3. Partial results replace the LIVE line — no duplicated stacking.
+4. Multiple sentences commit once each, no repeats.
+5. Switching language mid-session routes each sentence to its own buffer.
 
-WebDich 0.2 sẽ thay lớp SpeechRecognition bằng local streaming ASR chạy trong browser (WASM / WebGPU) để đạt được offline ASR thực sự.
+## Known limits (v0.1 by design)
+
+- Single-language ASR pass; unsigned Vietnamese (no diacritics) may be misclassified.
+- No punctuation restoration — final text is raw ASR transcript.
+- No offline ASR; requires network for Chrome's speech service.
+- Buffers live in memory only — refresh clears them (no history by design).
+
+## Phase 2 hook
+
+`commitEnglish()` / `commitVietnamese()` are the exact insertion points for the
+future Translation module. The UI and Phase-1 pipeline stay unchanged.
