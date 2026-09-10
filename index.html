@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <meta
+        name="theme-color"
+        content="#111111"
+    >
+
+    <title>WebDich 0.1</title>
+
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+</head>
+
+<body>
+
+<main class="app">
+
+    <header>
+        <h1>WebDich 0.1</h1>
+        <p>Realtime Voice → Text</p>
+    </header>
+
+    <section class="controls">
+
+        <select id="language">
+            <option value="en-US">English (US)</option>
+            <option value="en-GB">English (UK)</option>
+            <option value="vi-VN">Vietnamese</option>
+        </select>
+
+        <button id="startBtn">
+            🎤 START
+        </button>
+
+        <button id="stopBtn" disabled>
+            ■ STOP
+        </button>
+
+        <button id="clearBtn">
+            CLEAR
+        </button>
+
+    </section>
+
+    <section class="status">
+        <div>
+            <span>Status</span>
+            <strong id="status">IDLE</strong>
+        </div>
+
+        <div>
+            <span>Final words</span>
+            <strong id="finalWords">0</strong>
+        </div>
+
+        <div>
+            <span>Live words</span>
+            <strong id="liveWords">0</strong>
+        </div>
+
+        <div>
+            <span>Session</span>
+            <strong id="sessionTime">00:00</strong>
+        </div>
+    </section>
+
+    <section class="transcript">
+
+        <div class="panel">
+            <h2>FINAL</h2>
+            <div id="finalText"></div>
+        </div>
+
+        <div class="panel live">
+            <h2>LIVE</h2>
+            <div id="liveText"></div>
+        </div>
+
+    </section>
+
+    <section class="info">
+        <p id="supportMessage"></p>
+    </section>
+
+</main>
+
+<script src="app.js"></script>
+
+</body>
+</html>
