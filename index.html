@@ -4,7 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#000000">
-  <title>WebDich v0.1 — Voice → Text</title>
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>WebDich v0.2 — Voice → Text</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -14,10 +17,8 @@
 </head>
 <body>
   <div class="app">
-
     <!-- 1/6 — LIVE VOICE (spec §2.1): only realtime partial text -->
     <div id="live" class="live" aria-live="polite"></div>
-
     <!-- 4/6 — FINAL: EN left, VI right (spec §3) -->
     <div class="final">
       <div id="final-en" class="col">
@@ -27,7 +28,6 @@
         <div class="col-label">Final Vietnamese</div>
       </div>
     </div>
-
     <!-- 1/6 — MIC (spec §13) -->
     <div class="mic-row">
       <button id="mic" aria-label="Toggle microphone" aria-pressed="false">
@@ -38,9 +38,7 @@
         </svg>
       </button>
     </div>
-
   </div>
-
-  <script src="app.js"></script>
+  <script src="app.js?v=0.2"></script>
 </body>
 </html>
