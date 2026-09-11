@@ -7,7 +7,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <title>WebDich v0.4 — Voice → Text (channel toggles)</title>
+  <title>WebDich v0.7 — Voice → Text + Translate + TTS (rate + echo filter)</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -19,13 +19,29 @@
   <div class="app">
     <!-- 1/6 — LIVE VOICE -->
     <div id="live" class="live" aria-live="polite"></div>
-    <!-- 3.5/6 — FINAL: EN left, VI right (channel-toggleable) -->
+    <!-- 3.5/6 — FINAL: EN left, VI right (each with TTS rate slider in header) -->
     <div class="final">
       <div id="final-en" class="col">
-        <div class="col-label">Final English</div>
+        <div class="col-header">
+          <div class="col-label">Final English</div>
+          <div class="rate-ctrl">
+            <span>TTS</span>
+            <input type="range" id="rate-en" min="1" max="1.2" step="0.05" value="1.1" aria-label="TTS speed English">
+            <span id="rate-en-val">1.1×</span>
+          </div>
+        </div>
+        <div class="col-body" id="body-en"></div>
       </div>
       <div id="final-vi" class="col">
-        <div class="col-label">Final Vietnamese</div>
+        <div class="col-header">
+          <div class="col-label">Final Vietnamese</div>
+          <div class="rate-ctrl">
+            <span>TTS</span>
+            <input type="range" id="rate-vi" min="1" max="1.2" step="0.05" value="1.1" aria-label="TTS speed Vietnamese">
+            <span id="rate-vi-val">1.1×</span>
+          </div>
+        </div>
+        <div class="col-body" id="body-vi"></div>
       </div>
     </div>
     <!-- 1.5/6 — CHANNEL TOGGLES + MIC -->
@@ -42,6 +58,6 @@
     </div>
     <div id="version-badge" class="version-badge"></div>
   </div>
-  <script src="app.js?v=0.4"></script>
+  <script src="app.js?v=0.7"></script>
 </body>
 </html>
