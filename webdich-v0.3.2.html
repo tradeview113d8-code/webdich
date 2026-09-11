@@ -1,3 +1,199 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#000000">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>WebDich v0.2 — Voice → Text</title>
+      <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+/* WebDich v0.1 — ultra-minimal, black, thin borders, mobile-first (spec §15, §16) */
+:root {
+  --bg: #000000;
+  --line: rgba(255, 255, 255, 0.12);
+  --text: #f2f2f2;
+  --muted: rgba(255, 255, 255, 0.42);
+  --live: rgba(255, 255, 255, 0.6);
+  --mic-off: #3a3a3a;
+  --mic-on: #ffffff;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body { height: 100%; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Be Vietnam Pro', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+.app {
+  position: relative;
+  height: 100dvh;
+  height: 100vh; /* fallback */
+  display: flex;
+  flex-direction: column;
+  max-width: 560px;
+  margin: 0 auto;
+  border-left: 1px solid var(--line);
+  border-right: 1px solid var(--line);
+}
+/* persistent tiny version badge — always visible to confirm which build is deployed */
+.version-badge {
+  position: absolute;
+  bottom: 6px;
+  right: 10px;
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  color: rgba(255, 255, 255, 0.28);
+  pointer-events: none;
+  z-index: 5;
+  font-weight: 500;
+}
+
+/* ---- LIVE VOICE — 1/6 (spec §2.1) ---- */
+.live {
+  flex: 0 0 16.6667%;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--line);
+  font-size: clamp(16px, 4.5vw, 22px);
+  font-weight: 300;
+  color: var(--live);
+  text-align: center;
+  overflow: hidden;
+  line-height: 1.4;
+  word-break: break-word;
+}
+.live.status {
+  color: rgba(255, 130, 130, 0.85);
+  font-size: 13px;
+  letter-spacing: 0.02em;
+}
+
+/* ---- FINAL — 4/6, two columns (spec §3) ---- */
+.final {
+  flex: 1 1 auto; /* fills remaining ~66.67% */
+  min-height: 0;
+  display: flex;
+  border-bottom: 1px solid var(--line);
+}
+.col {
+  flex: 1 1 50%;
+  min-width: 0;
+  padding: 14px 12px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.col + .col { border-left: 1px solid var(--line); }
+.col-label {
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 12px;
+  font-weight: 500;
+}
+.col p {
+  font-size: 15px;
+  line-height: 1.6;
+  font-weight: 400;
+  margin-bottom: 12px;
+  color: var(--text);
+  word-break: break-word;
+}
+
+/* ---- MIC — 1/6 (spec §13, §14) ---- */
+.mic-row {
+  flex: 0 0 16.6667%;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#mic {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--mic-off); /* OFF = gray */
+  cursor: pointer;
+  padding: 0;
+  position: relative;
+  transition: background 0.2s ease, transform 0.1s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+#mic.on { background: var(--mic-on); } /* ON = white */
+#mic:active { transform: scale(0.94); }
+#mic svg {
+  width: 26px;
+  height: 26px;
+  display: block;
+  margin: 0 auto;
+}
+#mic .mic-stroke { stroke: #9a9a9a; transition: stroke 0.2s ease; }
+#mic.on .mic-stroke { stroke: #000000; }
+
+/* subtle pulse ring while listening — simple, no complex animation */
+#mic.on::before {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  animation: wd-pulse 2.2s ease-out infinite;
+  pointer-events: none;
+}
+@keyframes wd-pulse {
+  0%   { transform: scale(0.92); opacity: 0.9; }
+  100% { transform: scale(1.3);  opacity: 0; }
+}
+
+@media (max-width: 380px) {
+  #mic { width: 56px; height: 56px; }
+  #mic svg { width: 22px; height: 22px; }
+  .col p { font-size: 14px; }
+}
+
+</style>
+</head>
+<body>
+  <div class="app">
+    <!-- 1/6 — LIVE VOICE (spec §2.1): only realtime partial text -->
+    <div id="live" class="live" aria-live="polite"></div>
+    <!-- 4/6 — FINAL: EN left, VI right (spec §3) -->
+    <div class="final">
+      <div id="final-en" class="col">
+        <div class="col-label">Final English</div>
+      </div>
+      <div id="final-vi" class="col">
+        <div class="col-label">Final Vietnamese</div>
+      </div>
+    </div>
+    <!-- 1/6 — MIC (spec §13) -->
+    <div class="mic-row">
+      <button id="mic" aria-label="Toggle microphone" aria-pressed="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect class="mic-stroke" x="9" y="3" width="6" height="11" rx="3"/>
+          <path class="mic-stroke" d="M5 11a7 7 0 0 0 14 0"/>
+          <line class="mic-stroke" x1="12" y1="18" x2="12" y2="22"/>
+        </svg>
+      </button>
+    </div>
+    <div id="version-badge" class="version-badge"></div>
+  </div>
+  <script>
 /* WebDich v0.3 — Voice → Text (dual-language ASR, row-synced chunks)
  * Fix language misclassification: run TWO SpeechRecognition instances simultaneously
  * (en-US + vi-VN) on the same audio, compare both transcriptions, commit the winner
@@ -400,3 +596,7 @@
     };
   }
 })();
+
+</script>
+</body>
+</html>
