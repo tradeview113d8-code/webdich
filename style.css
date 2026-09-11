@@ -93,10 +93,12 @@ body {
   font-size: 15px;
   line-height: 1.6;
   font-weight: 400;
-  margin-bottom: 12px;
-  color: var(--text);
   word-break: break-word;
 }
+/* Phase 2: each row cell = final (source, gray) + trans (target, white, below) */
+.row-cell { margin-bottom: 14px; }
+.final-text { color: rgba(255, 255, 255, 0.5); margin-bottom: 4px; } /* source = gray */
+.trans-text { color: #ffffff; margin-bottom: 0; }                   /* translation = white */
 /* ---- CONTROLS — 1.5/6: EN toggle | MIC | VI toggle ---- */
 .mic-row {
   flex: 0 0 25%;
