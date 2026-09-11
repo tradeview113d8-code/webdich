@@ -7,19 +7,19 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <title>WebDich v0.2 — Voice → Text</title>
+  <title>WebDich v0.4 — Voice → Text (channel toggles)</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div class="app">
-    <!-- 1/6 — LIVE VOICE (spec §2.1): only realtime partial text -->
+    <!-- 1/6 — LIVE VOICE -->
     <div id="live" class="live" aria-live="polite"></div>
-    <!-- 4/6 — FINAL: EN left, VI right (spec §3) -->
+    <!-- 3.5/6 — FINAL: EN left, VI right (channel-toggleable) -->
     <div class="final">
       <div id="final-en" class="col">
         <div class="col-label">Final English</div>
@@ -28,8 +28,9 @@
         <div class="col-label">Final Vietnamese</div>
       </div>
     </div>
-    <!-- 1/6 — MIC (spec §13) -->
+    <!-- 1.5/6 — CHANNEL TOGGLES + MIC -->
     <div class="mic-row">
+      <button id="ch-en" class="channel-btn on" aria-label="Toggle English channel" aria-pressed="true">EN</button>
       <button id="mic" aria-label="Toggle microphone" aria-pressed="false">
         <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <rect class="mic-stroke" x="9" y="3" width="6" height="11" rx="3"/>
@@ -37,9 +38,10 @@
           <line class="mic-stroke" x1="12" y1="18" x2="12" y2="22"/>
         </svg>
       </button>
+      <button id="ch-vi" class="channel-btn on" aria-label="Toggle Vietnamese channel" aria-pressed="true">VI</button>
     </div>
     <div id="version-badge" class="version-badge"></div>
   </div>
-  <script src="app.js?v=0.2"></script>
+  <script src="app.js?v=0.4"></script>
 </body>
 </html>
